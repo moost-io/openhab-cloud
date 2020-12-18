@@ -21,7 +21,6 @@ set -e
 KUBERNETES_NAMESPACE=openhab-cloud
 KUBERNETES_ACCOUNT=openhabcloud
 
-
 echo DEPLOYING OPENHAB-CLOUD TO KUBERNETES
 
 # Creating the openHAB-cloud namespace
@@ -32,12 +31,26 @@ kubectl create namespace $KUBERNETES_NAMESPACE
 
 kubectl create serviceaccount $KUBERNETES_ACCOUNT --namespace $KUBERNETES_NAMESPACE
 
+# Create needed configmaps before first use
+
+kubectl create configmap openhabcloud-nginx-config --from-file=nginx_openhabcloud.conf --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_config_map.yml --namespace $KUBERNETES_NAMESPACE
 
 ### Create openHAB-cloud from template
 
 echo Creating openHAB-cloud from template ...
 
-kubectl create -f openhabcloud_ephemeral_k8_template.yml --namespace $KUBERNETES_NAMESPACE
+# gcloud compute addresses create address-name --global
+
+kubectl create -f openhabcloud_app.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_certificate.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_app_service.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_app_ingress.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_mongodb.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_mongodb_service.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_redis.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_redis_service.yml --namespace $KUBERNETES_NAMESPACE
+kubectl create -f openhabcloud_loadbalancer.yml --namespace $KUBERNETES_NAMESPACE
 
 echo Creating openHAB-cloud from template ... done!
 

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openhab-config-json-template
+  namespace: openhab-cloud
+data:
+  config.json.template: |
+    {
+        "system": {
+          "host": "${DOMAIN_NAME}",
+          "port": "443",
+          "protocol": "https",
+          "logger" : {
+            "type": "console"
+          },
+          "subDomainCookies": false
+        },
+        "express":{
+          "key" : "${EXPRESS_KEY}"
+        },
+        "apn" : {
+          "gateway": "gateway.push.apple.com",
+          "cert": "certs/aps/aps_production_cert.pem",
+          "key": "certs/aps/aps_production_key.pem",
+          "passphrase": "passphrase"
+        },
+        "gcm" : {
+          "jid": "166327818581@gcm.googleapis.com",
+          "password": "AAAAJrnpGVU:APA91bGYT9vFg2b2HmFdm5hhgeJqqYdJw2Agw-6DyFPIkZp202vJeji9_Fc0LLanPJxfcR0K8eQejm6HNX28bLWsy1O_XCswLbSSaTg30Kvis7J4vWQmOMLfLU3jCnCdgb3wHvsYu2jx"
+        },
+        "ifttt" : {
+          "iftttChannelKey" : "key",
+          "iftttTestToken" : "token"
+        },
+        "mongodb": {
+            "hosts": ["mongodb"],
+            "db": "openhab"
+        },
+        "redis": {
+            "host": "redis",
+            "port": "6379",
+            "password": "123_openHAB"
+        },
+        "mailer": {
+            "host" : "smtp",
+            "port": 465,
+            "secureConnection": true,
+            "user": "my@openhab.org",
+            "password": "123_openHAB",
+            "from": "My openHAB <my@openhab.org>"
+        },
+        "legal": {
+            "terms" : "",
+            "policy": ""
+        },
+        "registration_enabled": true
+    }

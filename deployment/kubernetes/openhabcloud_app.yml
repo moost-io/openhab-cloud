@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openhab-cloud
+  namespace: openhab-cloud
+  labels:
+    org.openhab.cloud.service: app-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      org.openhab.cloud.service: app-1
+  template:
+    metadata:
+      labels:
+        org.openhab.cloud.service: app-1
+    spec:
+      containers:
+        - name: app-1
+          image: us-east4-docker.pkg.dev/dev-recommender-platform/moost-docker-registry/openhabcloud-app:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DOMAIN_NAME
+              value: "openhab.moost.io"
+            - name: EXPRESS_KEY
+              value: "EXPRESS_TEST_KEY"
+          workingDir: /opt/openhabcloud
+          volumeMounts:
+            - name: openhab-config-json-template-volume
+              mountPath: /opt/openhabcloud/config.json.template
+              subPath: config.json.template
+        - name: nginx
+          image: bitnami/nginx
+          ports:
+            - containerPort: 8081
+            - containerPort: 8443
+          resources: { }
+          volumeMounts:
+            - mountPath: /opt/openhabcloud
+              name: app-1
+            - mountPath: /opt/bitnami/nginx/conf/server_blocks/openhab_cloud_server_block.conf
+              name: openhab-nginx-config-volume
+              subPath: nginx_openhabcloud.conf
+      volumes:
+        - name: openhab-config-json-template-volume
+          configMap:
+            name: openhab-config-json-template
+        - name: app-1
+          emptyDir: { }
+        - name: openhab-nginx-config-volume
+          configMap:
+            name: openhabcloud-nginx-config
+      restartPolicy: Always

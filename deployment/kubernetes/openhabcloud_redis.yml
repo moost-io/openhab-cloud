@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: openhab-cloud
+  labels:
+    org.openhab.cloud.service: redis
+spec:
+  replicas: 1
+  strategy: { }
+  selector:
+    matchLabels:
+      org.openhab.cloud.service: redis
+  template:
+    metadata:
+      labels:
+        org.openhab.cloud.service: redis
+    spec:
+      containers:
+        - env:
+            - name: REDIS_PASSWORD
+              value: 123_openHAB
+          image: bitnami/redis:latest
+          name: redis
+          ports:
+            - containerPort: 6379
+          resources: { }
+      restartPolicy: Always

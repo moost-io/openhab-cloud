@@ -1,0 +1,17 @@
+apiVersion: "extensions/v1beta1"
+kind: Ingress
+metadata:
+  name: "openhab-cloud-ingress-service"
+  namespace: "openhab-cloud"
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "opemhab-cloud-adress"
+    networking.gke.io/managed-certificates: "openhab-cloud-certificate"
+spec:
+  rules:
+    - host: openhab.moost.io # CHANGE ME!
+      http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: nginx
+              servicePort: 443
