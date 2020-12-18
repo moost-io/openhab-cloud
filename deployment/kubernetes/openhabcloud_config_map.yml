@@ -26,7 +26,6 @@ data:
         },
         "gcm" : {
           "jid": "166327818581@gcm.googleapis.com",
-          "password": "AAAAJrnpGVU:APA91bGYT9vFg2b2HmFdm5hhgeJqqYdJw2Agw-6DyFPIkZp202vJeji9_Fc0LLanPJxfcR0K8eQejm6HNX28bLWsy1O_XCswLbSSaTg30Kvis7J4vWQmOMLfLU3jCnCdgb3wHvsYu2jx"
         },
         "ifttt" : {
           "iftttChannelKey" : "key",
