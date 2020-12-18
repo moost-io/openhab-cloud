@@ -1,0 +1,9 @@
+{
+  "api": {
+    "host": "https://api.dev.moost.io",
+    "events": "events/v1"
+  },
+  "openhabcloud": {
+    "ignoressl": true
+  }
+}

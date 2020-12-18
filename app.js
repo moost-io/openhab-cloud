@@ -30,7 +30,7 @@ var logger = require('./logger.js'),
 
 
 //load and set our configuration, delete any cache first
-var loadConfig = function() {
+var loadConfig = function () {
     delete require.cache[require.resolve('./config.json')];
     config = require('./config.json');
     system.setConfiguration(config);
@@ -49,8 +49,8 @@ process.on('uncaughtException', function (err) {
 });
 
 process.on('SIGHUP', function () {
-  logger.info('Reloading config...');
-  loadConfig();
+    logger.info('Reloading config...');
+    loadConfig();
 });
 
 logger.info('openHAB-cloud: Backend logging initialized...');
@@ -75,7 +75,7 @@ var flash = require('connect-flash'),
     cookieParser = require('cookie-parser'),
     session = require('express-session'),
     favicon = require('serve-favicon'),
-    firebase = require('./notificationsender/firebase');
+    firebase = require('./notificationsender/firebase'),
     csurf = require('csurf'),
     serveStatic = require('serve-static'),
     homepage = require('./routes/homepage'),
@@ -94,17 +94,28 @@ var flash = require('connect-flash'),
     Limiter = require('ratelimiter'),
     requesttracker = require('./requesttracker'),
     routes = require('./routes'),
-    MongoConnect = require('./system/mongoconnect');
+    MongoConnect = require('./system/mongoconnect'),
+    moostSubscribers = require('./modules/moost/subscribers');
+
+// Initialize EventEmitter
+var eventEmitter = require('./system/eventbus');
+// Initialize Subscribers
+eventEmitter.addListener('itemupdate', moostSubscribers.itemUpdateListener);
+eventEmitter.addListener('sendRecommendation', sendRecommendationToUser)
+
+function sendRecommendationToUser(data) {
+    sendNotificationToUser(data.user, data.message, data.icon, data.severity)
+}
 
 // MongoDB connection settings
 var mongoose = require('mongoose');
 // MongoDB Caching for Item updates
 var cachegoose = require('cachegoose');
 cachegoose(mongoose, {
-  engine: 'redis',
-  port: config.redis.port, 
-  host: config.redis.host,
-  password: config.redis.password,
+    engine: 'redis',
+    port: config.redis.port,
+    host: config.redis.host,
+    password: config.redis.password,
 });
 var cacheTTL = config.cacheTTL || 600;
 
@@ -169,13 +180,13 @@ if (taskEnv === 'main') {
             Openhab.findOne({
                 uuid: offlineOpenhabUuid
             }).exec(function (error, openhab) {
-              if (!openhab || error) {
-                  return;
-              }
-              //if this has not connected to another server, then notify
-              if(openhab.serverAddress == internalAddress){
-                notifyOpenHABOwnerOffline(openhab);
-              }
+                if (!openhab || error) {
+                    return;
+                }
+                //if this has not connected to another server, then notify
+                if (openhab.serverAddress == internalAddress) {
+                    notifyOpenHABOwnerOffline(openhab);
+                }
             });
         }
     }, 60000);
@@ -193,7 +204,7 @@ setInterval(function () {
         if (res.finished) {
             logger.debug('openHAB-cloud: expiring orphaned response');
             requestTracker.remove(requestId);
-            if(res.openhab) {
+            if (res.openhab) {
                 io.sockets.in(res.openhab.uuid).emit('cancel', {
                     id: requestId
                 });
@@ -229,10 +240,16 @@ app.use(favicon(__dirname + '/public/img/favicon.ico'));
 if (system.getLoggerMorganOption())
     app.use(system.getLoggerMorganOption());
 
-app.use(bodyParser.json({verify:function(req,res,buf){req.rawBody=buf}}))
+app.use(bodyParser.json({
+    verify: function (req, res, buf) {
+        req.rawBody = buf
+    }
+}))
 app.use(bodyParser.urlencoded({
-        verify:function(req,res,buf){req.rawBody=buf},
-        extended: true
+    verify: function (req, res, buf) {
+        req.rawBody = buf
+    },
+    extended: true
 
 }));
 app.use(methodOverride());
@@ -240,7 +257,7 @@ app.use(cookieParser(config.express.key));
 
 // Configurable support for cross subdomain cookies
 var cookie = {};
-if(config.system.subDomainCookies){
+if (config.system.subDomainCookies) {
     cookie.path = '/';
     cookie.domain = '.' + system.getHost();
     logger.info('openHAB-cloud: Cross sub domain cookie support is configured for domain: ' + cookie.domain);
@@ -271,17 +288,17 @@ app.use(function (req, res, next) {
     }
     // If host matches names for full /* proxying, go ahead and just proxy it.
     if (host.indexOf('remote.') === 0 || host.indexOf('home.') === 0) {
-      //make sure this was not set by another server
-      if(req.url.indexOf('/remote') != 0){
-        req.url = '/remote' + req.url;
-      }
+        //make sure this was not set by another server
+        if (req.url.indexOf('/remote') != 0) {
+            req.url = '/remote' + req.url;
+        }
     }
     next();
 });
 app.use(function (req, res, next) {
     var csrf = csurf();
     // Check if url needs csrf, remote connections and REST connections are excluded from CSRF
-    if (!req.path.match('/rest*') && !req.path.match('/oauth2/token') && !req.path.match('/ifttt/*') && !req.path.match('/remote/*'))
+    if (!req.path.match('/rest*') && !req.path.match('/oauth2/token') && !req.path.match('/ifttt/*') && !req.path.match('/moost/*') && !req.path.match('/remote/*'))
         csrf(req, res, next);
     else
         next();
@@ -481,7 +498,7 @@ io.sockets.on('connection', function (socket) {
             // Make an event and notification only if openhab was offline
             // If it was marked online, means reconnect appeared because of my.oh fault
             // We don't want massive events and notifications when node is restarted
-              logger.info('openHAB-cloud: uuid ' + socket.handshake.uuid + ' server address ' + openhab.serverAddress + " my address " + internalAddress);
+            logger.info('openHAB-cloud: uuid ' + socket.handshake.uuid + ' server address ' + openhab.serverAddress + " my address " + internalAddress);
             if (openhab.status === 'offline' || openhab.serverAddress !== internalAddress) {
                 openhab.status = 'online';
                 openhab.serverAddress = internalAddress;
@@ -743,7 +760,7 @@ io.sockets.on('connection', function (socket) {
 
     socket.on('itemupdate', function (data) {
         //disabling item updates for now
-        return;
+
         var self = this;
         //if openhabId is missing then user has not completed auth
         if (self.openhabId === undefined) {
@@ -752,7 +769,7 @@ io.sockets.on('connection', function (socket) {
         var limiter = new Limiter({
             id: self.openhabId,
             db: redis,
-            max: 10,
+            max: 10000,
             duration: 30000
         });
         limiter.get(function (err, limit) {
@@ -861,6 +878,9 @@ io.sockets.on('connection', function (socket) {
                                 }
                             });
                         }
+                        // Emit event, such that other modules can work with the updatedItem
+                        eventEmitter.emit('itemupdate', itemToUpdate);
+
                         // Thus if item status didn't change, there will be no event...
                     }
                 });
@@ -964,31 +984,31 @@ io.sockets.on('connection', function (socket) {
 
 function notifyOpenHABStatusChange(openhab, status) {
 
-  //we can mute notifications, for example when we are doing a deploy
-  if(system.getMuteNotifications()){
-    return;
-  }
+    //we can mute notifications, for example when we are doing a deploy
+    if (system.getMuteNotifications()) {
+        return;
+    }
 
-  User.find({
-      account: openhab.account,
-      role: 'master'
-  }, function (error, users) {
-      if (!error && users) {
-          for (var i = 0; i < users.length; i++) {
-              if (status === 'online') {
-                  sendNotificationToUser(users[i], 'openHAB is online', 'openhab', 'good');
-              } else {
-                  sendNotificationToUser(users[i], 'openHAB is offline', 'openhab', 'bad');
-              }
-          }
-      } else {
-          if (error) {
-              logger.warn('openHAB-cloud: Error finding users to notify: ' + error);
-          } else {
-              logger.warn('openHAB-cloud: Unable to find any masters for openHAB ' + openhab.uuid);
-          }
-      }
-  });
+    User.find({
+        account: openhab.account,
+        role: 'master'
+    }, function (error, users) {
+        if (!error && users) {
+            for (var i = 0; i < users.length; i++) {
+                if (status === 'online') {
+                    sendNotificationToUser(users[i], 'openHAB is online', 'openhab', 'good');
+                } else {
+                    sendNotificationToUser(users[i], 'openHAB is offline', 'openhab', 'bad');
+                }
+            }
+        } else {
+            if (error) {
+                logger.warn('openHAB-cloud: Error finding users to notify: ' + error);
+            } else {
+                logger.warn('openHAB-cloud: Unable to find any masters for openHAB ' + openhab.uuid);
+            }
+        }
+    });
 }
 
 function shutdown() {

@@ -16,7 +16,8 @@ var system = require('../system'),
     setSessionTimezone = require('./setTimezone'),
     androidRegistrationService = require('./androidRegistrationService'),
     appleRegistrationService = require('./appleRegistrationService');
-    ifttt_routes = require('./ifttt');
+ifttt_routes = require('./ifttt');
+moost_routes = require('../modules/moost/routes');
 
 /**
  * Constructs the Routes object.
@@ -50,6 +51,7 @@ Routes.prototype.setupRoutes = function (app) {
     this.setupSystemConfigurationRoutes(app);
     this.setupOAuthRoutes(app);
     this.setupIFTTTRoutes(app);
+    this.setupMOOSTRoutes(app);
     this.setupTimezoneRoutes(app);
     this.setupApiRoutes(app);
     this.setupStaffRoutes(app);
@@ -99,18 +101,18 @@ Routes.prototype.setupLoginLogoutRoutes = function (app) {
         });
     });
 
-    app.post('/login', account_routes.loginpostvalidate, 
-    //use express-form sanitized data for passport  
-    function(req, res, next) {
-        req.body.username = req.form.username;
-        req.body.password = req.form.password;
-        next();
-      },
-    passport.authenticate('local', {
-        successReturnToOrRedirect: '/',
-        failureRedirect: '/login',
-        failureFlash: true
-    }));
+    app.post('/login', account_routes.loginpostvalidate,
+        //use express-form sanitized data for passport
+        function (req, res, next) {
+            req.body.username = req.form.username;
+            req.body.password = req.form.password;
+            next();
+        },
+        passport.authenticate('local', {
+            successReturnToOrRedirect: '/',
+            failureRedirect: '/login',
+            failureFlash: true
+        }));
 };
 
 Routes.prototype.setupAccountRoutes = function (app) {
@@ -205,6 +207,11 @@ Routes.prototype.setupIFTTTRoutes = function (app) {
     app.post('/ifttt/v1/triggers/item_dropped_below/fields/item/options', ifttt_routes.v1actioncommanditemoptions);
 };
 
+Routes.prototype.setupMOOSTRoutes = function (app) {
+    this.logger.info('openHAB-cloud: MOOST is configured, app handling MOOST capabilities...');
+    app.post('/moost/v1/triggers/recommendation', moost_routes.v1triggerrecommendation);
+}
+
 Routes.prototype.setupTimezoneRoutes = function (app) {
     // A route to set session timezone automatically detected in browser
     app.all('/setTimezone', setSessionTimezone);
@@ -262,7 +269,7 @@ Routes.prototype.ensureRestAuthenticated = function (req, res, next) {
     if (req.isAuthenticated()) {
         return next();
     }
-    return passport.authenticate(['basic','bearer'], {session: false})(req, res, next);
+    return passport.authenticate(['basic', 'bearer'], {session: false})(req, res, next);
 };
 
 // Ensure user have 'master' role for certain homepage
@@ -282,18 +289,18 @@ Routes.prototype.ensureStaff = function (req, res, next) {
 };
 
 /**
-* Certain requests must be served from the same server that a user's openHAB
-* is connected to.  If we are not the right server we will send a redirect upstream
-* which should be handled internally by nginx, and not the requesting client
-**/
-Routes.prototype.ensureServer = function(req, res, next) {
-  if (req.openhab.serverAddress != system.getInternalAddress()){
-    //redirect a request to correct cloud server
-    res.redirect(307, 'http://' + req.openhab.serverAddress + req.path);
-  } else {
-    res.cookie('CloudServer',system.getInternalAddress(), { maxAge: 900000, httpOnly: true });
-    return next();
-  }
+ * Certain requests must be served from the same server that a user's openHAB
+ * is connected to.  If we are not the right server we will send a redirect upstream
+ * which should be handled internally by nginx, and not the requesting client
+ **/
+Routes.prototype.ensureServer = function (req, res, next) {
+    if (req.openhab.serverAddress != system.getInternalAddress()) {
+        //redirect a request to correct cloud server
+        res.redirect(307, 'http://' + req.openhab.serverAddress + req.path);
+    } else {
+        res.cookie('CloudServer', system.getInternalAddress(), {maxAge: 900000, httpOnly: true});
+        return next();
+    }
 };
 
 Routes.prototype.setOpenhab = function (req, res, next) {
@@ -323,23 +330,23 @@ Routes.prototype.setOpenhab = function (req, res, next) {
     });
 };
 
-Routes.prototype.preassembleBody = function(req, res, next) {
-  //app.js will catch any JSON or URLEncoded related requests and
-  //store the rawBody on the request, all other requests need
-  //to have that data collected and stored here
-  var data = '';
-  if (req.rawBody === undefined || req.rawBody === "") {
-    req.on('data', function(chunk) {
-      data += chunk;
-    });
-    req.on('end', function() {
-      req.rawBody = data;
-      next();
-    });
-  } else {
-    req.rawBody = req.rawBody.toString();
-    next();
-  }
+Routes.prototype.preassembleBody = function (req, res, next) {
+    //app.js will catch any JSON or URLEncoded related requests and
+    //store the rawBody on the request, all other requests need
+    //to have that data collected and stored here
+    var data = '';
+    if (req.rawBody === undefined || req.rawBody === "") {
+        req.on('data', function (chunk) {
+            data += chunk;
+        });
+        req.on('end', function () {
+            req.rawBody = data;
+            next();
+        });
+    } else {
+        req.rawBody = req.rawBody.toString();
+        next();
+    }
 };
 
 Routes.prototype.proxyRouteOpenhab = function (req, res) {
@@ -355,7 +362,7 @@ Routes.prototype.proxyRouteOpenhab = function (req, res) {
         res.end('openHAB is offline');
         return;
     }
-    
+
     //tell OH3 to use alternative Authentication header
     res.cookie('X-OPENHAB-AUTH-HEADER', 'true')
 
