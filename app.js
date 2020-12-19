@@ -101,11 +101,7 @@ var flash = require('connect-flash'),
 var eventEmitter = require('./system/eventbus');
 // Initialize Subscribers
 eventEmitter.addListener('itemupdate', moostSubscribers.itemUpdateListener);
-eventEmitter.addListener('sendRecommendation', sendRecommendationToUser)
-
-function sendRecommendationToUser(data) {
-    sendNotificationToUser(data.user, data.message, data.icon, data.severity)
-}
+eventEmitter.addListener('sendRecommendation', sendNotificationToUser)
 
 // MongoDB connection settings
 var mongoose = require('mongoose');
