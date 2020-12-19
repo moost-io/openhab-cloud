@@ -1,16 +1,16 @@
 // This module handles shared redis client for all
 
-var app = require('./app.js'),
+var config = require('./config.json'),
     logger = require('./logger.js'),
     redis = require('redis'),
     redisClient;
 
-logger.info('openHAB-cloud: Connecting to Redis at ' + app.config.redis.host + ':' + app.config.redis.port);
+logger.info('openHAB-cloud: Connecting to Redis at ' + config.redis.host + ':' + config.redis.port);
 
-redisClient = redis.createClient(app.config.redis.port, app.config.redis.host);
+redisClient = redis.createClient(config.redis.port, config.redis.host);
 
-if (typeof app.config.redis.password !== 'undefined') {
-    redisClient.auth(app.config.redis.password, function(error, data) {
+if (typeof config.redis.password !== 'undefined') {
+    redisClient.auth(config.redis.password, function (error, data) {
         if (error) {
             logger.error(error);
         } else {

@@ -2,6 +2,7 @@ const system = require('../system');
 const Firebase = require('firebase-messaging');
 const logger = require('../logger.js');
 const firebaseClient = new Firebase(system.getGcmPassword());
+const redis = require('../redis-helper');
 
 const firebaseOptions = {
     delay_while_idle: false,
@@ -9,7 +10,7 @@ const firebaseOptions = {
 };
 
 function sendNotificationWithData(registrationIds, data) {
-    redis.incr("androidNotificationId", function(error, androidNotificationId) {
+    redis.incr("androidNotificationId", function (error, androidNotificationId) {
         if (error) {
             return;
         }
@@ -24,7 +25,7 @@ function sendNotificationWithData(registrationIds, data) {
     });
 };
 
-exports.sendMessageNotification = function(registrationIds, message) {
+exports.sendMessageNotification = function (registrationIds, message) {
     var data = {
         message: message,
         timestamp: Date.now()
@@ -32,7 +33,7 @@ exports.sendMessageNotification = function(registrationIds, message) {
     sendNotificationWithData(registrationIds, data);
 };
 
-exports.sendNotification = function(registrationIds, notification) {
+exports.sendNotification = function (registrationIds, notification) {
     var data = {
         message: notification.message,
         severity: notification.severity,
@@ -43,7 +44,7 @@ exports.sendNotification = function(registrationIds, notification) {
     sendNotificationWithData(registrationIds, data);
 };
 
-exports.hideNotification = function(registrationIds, notificationId) {
+exports.hideNotification = function (registrationIds, notificationId) {
     const data = {
         type: 'hideNotification',
         notificationId: notificationId
