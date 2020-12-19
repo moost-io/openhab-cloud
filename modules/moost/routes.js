@@ -40,7 +40,7 @@ exports.v1triggerrecommendation = [
             severity: req.body.priority
         }
 
-        eventEmitter.emit('sendRecommendation', data)
+        eventEmitter.emit('sendRecommendation', data.user, data.message, data.icon, data.severity)
         res.sendStatus(204).end()
     }
 ]
