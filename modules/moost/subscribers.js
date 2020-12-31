@@ -6,11 +6,13 @@ const moostConfig = require('./config.json')
 const OAuth2Token = require('../../models/oauth2token');
 const User = require('../../models/user');
 const Openhab = require('../../models/openhab');
-const openHabCloudRESTHost = `https://${systemConfig.system.host}/rest`;
-const moostAPIHost = moostConfig.api.host;
-const moostAPIEvents = moostConfig.api.events;
-const moostEventsEndpoint = `${moostAPIHost}/${moostAPIEvents}`;
 const https = require('https')
+
+const OPENHAB_CLOUD_REST_HOST = `https://${systemConfig.system.host}/rest`;
+const MOOST_API_HOST = moostConfig.api.host;
+const MOOST_API_EVENTS_PATH = moostConfig.api.events;
+const MOOST_API_EVENTS_ENDPOINT = `${MOOST_API_HOST}/${MOOST_API_EVENTS_PATH}`;
+const MOOST_API_CUSTOMER_ID = '1';
 
 module.exports = {
     // Listen for itemupdate Events emitted by the app
@@ -46,7 +48,7 @@ module.exports = {
                         rejectUnauthorized: !moostConfig.openhabcloud.ignoressl
                     });
 
-                    axios.get(`${openHabCloudRESTHost}/things`, {
+                    axios.get(`${OPENHAB_CLOUD_REST_HOST}/things`, {
                         headers: {
                             Authorization: `Bearer ${oauth2token.token}`
                         },
@@ -100,7 +102,7 @@ function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation, stat
     )
 
     logger.debug('MOOST: Sending event ' + JSON.stringify(eventToSend))
-    axios.post(`${moostEventsEndpoint}`, eventToSend)
+    axios.post(`${MOOST_API_EVENTS_ENDPOINT}`, eventToSend)
         .then((res) => {
             logger.debug('openHAB-cloud: Sending event to MOOST ended with status: ' + res.status);
         }).catch((error) => {
@@ -114,6 +116,7 @@ function buildMOOSTEvent(eventTimeStamp, eventType, userid,
                          state, rawEvent) {
     return {
         "timestamp": eventTimeStamp,
+        "customerId": MOOST_API_CUSTOMER_ID,
         "type": eventType,
         "user": {
             "id": userid,
