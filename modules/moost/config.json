@@ -1,7 +1,12 @@
 {
   "api": {
     "host": "https://api.dev.moost.io",
-    "events": "events/v1"
+    "events": "events/v1",
+    "login": "login/v1",
+    "creds": {
+      "username": "testuser",
+      "password": "testpassword"
+    }
   },
   "openhabcloud": {
     "ignoressl": true

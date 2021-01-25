@@ -7,12 +7,14 @@ const OAuth2Token = require('../../models/oauth2token');
 const User = require('../../models/user');
 const Openhab = require('../../models/openhab');
 const https = require('https')
+const jwt_decode = require("jwt-decode");
 
 const OPENHAB_CLOUD_REST_HOST = `https://${systemConfig.system.host}/rest`;
 const MOOST_API_HOST = moostConfig.api.host;
-const MOOST_API_EVENTS_PATH = moostConfig.api.events;
-const MOOST_API_EVENTS_ENDPOINT = `${MOOST_API_HOST}/${MOOST_API_EVENTS_PATH}`;
+const MOOST_API_EVENTS_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.events}`;
+const MOOST_API_LOGIN_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.login}`;
 const MOOST_API_CUSTOMER_ID = '1';
+let MOOST_API_AUTH_TOKEN = '';
 
 module.exports = {
     // Listen for itemupdate Events emitted by the app
@@ -83,7 +85,7 @@ module.exports = {
     },
 };
 
-function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation, state) {
+async function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation, state) {
     const eventType = "DEVICE_EVENT_EMITTED";
 
     //"category": thingType.category,
@@ -101,14 +103,46 @@ function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation, stat
         itemToUpdate
     )
 
+    if (isAPITokenEmptyOrExpired()) {
+        await setAPIAuthToken();
+    }
+
     logger.debug('MOOST: Sending event ' + JSON.stringify(eventToSend))
-    axios.post(`${MOOST_API_EVENTS_ENDPOINT}`, eventToSend)
-        .then((res) => {
-            logger.debug('openHAB-cloud: Sending event to MOOST ended with status: ' + res.status);
-        }).catch((error) => {
-            logger.error('openHAB-cloud: Error sending event to MOOST: ' + error);
+    axios.post(`${MOOST_API_EVENTS_ENDPOINT}`, eventToSend, {
+        headers: {
+            'Authorization': `${MOOST_API_AUTH_TOKEN}`
         }
-    );
+    }).then((res) => {
+        logger.debug('openHAB-cloud: Sending event to MOOST ended with status: ' + res.status);
+    }).catch((error) => {
+        logger.error('openHAB-cloud: Error sending event to MOOST: ' + error);
+    });
+}
+
+function isAPITokenEmptyOrExpired() {
+    if (MOOST_API_AUTH_TOKEN !== '') {
+        const decoded = jwt_decode(MOOST_API_AUTH_TOKEN);
+        return Math.floor(new Date() / 1000) >= decoded.exp
+    } else {
+        return true;
+    }
+}
+
+async function setAPIAuthToken() {
+    await axios.post(`${MOOST_API_LOGIN_ENDPOINT}`, {
+            username: moostConfig.api.creds.username,
+            password: moostConfig.api.creds.password
+        }
+    ).then((res) => {
+        if ('authorization' in res.headers) {
+            MOOST_API_AUTH_TOKEN = res.headers['authorization']
+            logger.info('Successful received a new MOOST API Token. ' + MOOST_API_AUTH_TOKEN)
+        } else {
+            logger.error('Response from MOOST Auth Service did not include an Authorization Header.')
+        }
+    }).catch((error) => {
+        logger.error('openHAB-cloud: Error receiving JWT from MOOST: ' + error)
+    });
 }
 
 function buildMOOSTEvent(eventTimeStamp, eventType, userid,
