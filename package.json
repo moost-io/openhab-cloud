@@ -40,7 +40,7 @@
     "morgan": "^1.8.2",
     "node-gcm": "0.14.4",
     "node-xmpp-client": "3.2.0",
-    "nodemailer": "4.0.1",
+    "nodemailer": "6.4.16",
     "oauth2orize": "^1.11.0",
     "passport": "0.1.18",
     "passport-http": "0.2.2",
