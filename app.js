@@ -45,6 +45,7 @@ var internalAddress = system.getInternalAddress();
 logger.info('openHAB-cloud: Backend service is starting up...');
 
 process.on('uncaughtException', function (err) {
+    console.log(JSON.stringify(err))
     logger.error(err);
 });
 
@@ -68,7 +69,6 @@ module.exports.config = config;
 // Setup all homepage
 var flash = require('connect-flash'),
     express = require('express'),
-    methodOverride = require('method-override'),
     bodyParser = require('body-parser'),
     errorHandler = require('errorhandler'),
     morgan = require('morgan'),
@@ -86,7 +86,6 @@ var flash = require('connect-flash'),
     passport = require('passport'),
     RedisStore = require('connect-redis')(session),
     redis = require('./redis-helper'),
-    moment = require('moment'),
     date_util = require('./date_util.js'),
     appleSender = require('./notificationsender/aps-helper'),
     oauth2 = require('./routes/oauth2'),
@@ -195,8 +194,8 @@ if (taskEnv === 'main') {
 setInterval(function () {
     var requests = requestTracker.getAll();
     logger.debug('openHAB-cloud: Checking orphaned rest requests (' + requestTracker.size() + ')');
-    for (var requestId in requests) {
-        var res = requestTracker.get(requestId);
+    Object.keys(requests).forEach(function (requestId) {
+        var res = requests[requestId];
         if (res.finished) {
             logger.debug('openHAB-cloud: expiring orphaned response');
             requestTracker.remove(requestId);
@@ -206,7 +205,7 @@ setInterval(function () {
                 });
             }
         }
-    }
+    })
 }, 60000);
 
 // Setup mongoose data models
@@ -221,6 +220,7 @@ var OpenhabAccessLog = require('./models/openhabaccesslog');
 
 logger.info('openHAB-cloud: Scheduling a statistics job (every 5 min)');
 var every5MinStatJob = require('./jobs/every5minstat');
+const { request } = require('http');
 every5MinStatJob.start();
 
 // Configure the openHAB-cloud for development mode, if in development
@@ -248,7 +248,7 @@ app.use(bodyParser.urlencoded({
     extended: true
 
 }));
-app.use(methodOverride());
+
 app.use(cookieParser(config.express.key));
 
 // Configurable support for cross subdomain cookies
@@ -341,7 +341,7 @@ app.use(function (req, res, next) {
     } else {
         res.locals.timeZone = 'undefined';
     }
-    res.locals.moment = moment;
+
     res.locals.date_util = date_util;
 
     res.locals.legal = false;
@@ -360,7 +360,7 @@ var server = app.listen(system.getNodeProcessPort(), function () {
     logger.info('openHAB-cloud: express server listening on port ' + system.getNodeProcessPort());
 });
 
-var io = require('socket.io').listen(server, {
+var io = require('socket.io')(server, {
     logger: logger
 });
 
@@ -429,7 +429,7 @@ function sendIosNotifications(iosDeviceTokens, notification) {
 }
 
 // In case of polling transport set poll duration to 300 seconds
-io.set('polling duration', 300);
+//io.set('polling duration', 300);
 
 io.use(function (socket, next) {
     var handshakeData = socket.handshake;
@@ -900,10 +900,10 @@ io.sockets.on('connection', function (socket) {
             logger.info('openHAB-cloud: openHAB ' + self.handshake.uuid + ' requested to update ' + data.type + ' config ' +
                 data.name + ' with timestamp = ' + data.timestamp);
             OpenhabConfig.findOne({
-                    openhab: openhab.id,
-                    type: data.type,
-                    name: data.name
-                },
+                openhab: openhab.id,
+                type: data.type,
+                name: data.name
+            },
                 function (error, openhabConfig) {
                     if (error) {
                         logger.warn('openHAB-cloud: Failed to find ' + self.openhab.uuid + ' config: ' + error);
