@@ -1,4 +1,3 @@
-const {DEVICE_TYPE_MAPPINGS, STATE_TYPE_MAPPINGS} = require('./constants');
 const axios = require('axios');
 const logger = require('../../logger');
 const systemConfig = require('../../config.json')
@@ -15,12 +14,15 @@ const MOOST_API_EVENTS_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.events}`;
 const MOOST_API_LOGIN_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.login}`;
 const MOOST_API_CUSTOMER_ID = '1';
 let MOOST_API_AUTH_TOKEN = '';
+const AXIOS_AGENT= new https.Agent({
+    rejectUnauthorized: !moostConfig.openhabcloud.ignoressl
+});
 
 module.exports = {
-    // Listen for itemupdate Events emitted by the app
-    itemUpdateListener: function (itemToUpdate) {
-        logger.debug('MOOST: Received ItemUpdate via eventEmitter: ' + itemToUpdate);
-        Openhab.findById(itemToUpdate.openhab, function (error, openhab) {
+    // Listen for itemUpdate Events emitted by the app
+    itemUpdateListener: function (itemUpdate) {
+        logger.debug('MOOST: Received ItemUpdate via eventEmitter: ' + itemUpdate);
+        Openhab.findById(itemUpdate.openhab, function (error, openhab) {
             if (error) {
                 logger.error('openHAB lookup error: ' + error);
                 return;
@@ -44,71 +46,133 @@ module.exports = {
 
                 OAuth2Token.findOne({
                     user: user.id
-                }, function (error, oauth2token) {
-                    // At request level
-                    const agent = new https.Agent({
-                        rejectUnauthorized: !moostConfig.openhabcloud.ignoressl
-                    });
+                },  async function (error, oauth2token) {
+                    let moostDevice;
+                    //This Part loads the corresponding item and maps it to the moostState
+                    const openHABItem = await loadItemByItemName(oauth2token.token, itemUpdate.name);
+                    const moostState = convertOpenHABItemToMOOSTState(openHABItem, itemUpdate);
 
-                    axios.get(`${OPENHAB_CLOUD_REST_HOST}/things`, {
-                        headers: {
-                            Authorization: `Bearer ${oauth2token.token}`
-                        },
-                        httpsAgent: agent
-                    }).then((res) => {
-                        logger.debug('MOOST: Received all Things from local openhab');
-                        const allThings = res.data;
-                        const thing = allThings.find(thing => {
-                            return thing.channels.some(channel => {
-                                return channel.linkedItems.some(item => {
-                                    return item === itemToUpdate.name
-                                });
-                            })
-                        });
+                    //This Part identifies the connected thing and maps it to a MOOST Device
+                    //Same item can be linked to different things
+                    //(f.e. left home item can be updated by multiple different buttons)
+                    const configuredLinksForItem = await loadLinksByItemName(oauth2token.token, openHABItem.name);
+                    //We need to define what we will do if an item is linked to multiple devices
+                    //which device will be associated to the event in the MOOST Platform?
+                    //If we have here > 0 than there is a physical thing configured in OpenHAB for this Item
+                    //which we can load an convert to device information for the MOOST Platform
+                    //Otherwise we will just leave the DEVICE part empty
+                    //and assume the event is not triggered through a specific device
+                    if(configuredLinksForItem?.length === 1){
+                        const linkFromItemToThing = configuredLinksForItem[0];
+                        const thingUID = convertChannelUIDToThingUID(linkFromItemToThing.channelUID);
+                        const thing = await loadThingByThingUID(oauth2token.token, thingUID);
+                        moostDevice = convertOpenHABThingToMOOSTDevice(thing, itemUpdate);
+                    }
 
-                        if (thing) {
-                            logger.debug('MOOST: Found thing ' + thing.label + ' to item ' + itemToUpdate.name);
-                            const moostDeviceType = mapToMOOSTDeviceType(thing);
-                            const moostLocation = mapToMOOSTLocation(thing);
-                            const moostState = mapToMOOSTState(thing, itemToUpdate);
-
-                            sendEventToMOOST(itemToUpdate, thing, moostDeviceType, moostLocation, moostState);
-                        } else {
-                            logger.error('MOOST: No thing found for item ' + itemToUpdate.name)
-                        }
-                    }).catch((error) => {
-                        logger.error('openHAB-cloud: Error getting thins from openhab: ' + error);
-                    });
+                    sendEventToMOOST(itemUpdate, moostDevice, moostState)
                 });
             })
         });
     },
 };
 
-async function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation, state) {
-    const eventType = "DEVICE_EVENT_EMITTED";
+/**
+ * Load Item from the OpenHAB instance by ItemName
+ * @param oauth2token The Token which is used for authentication against the openHAB instance
+ * @param itemName The name of the OpenHAB Item for which we want to retrieve the full Item Object
+ * @returns {Promise<AxiosResponse<any>>}
+ */
+async function loadItemByItemName(oauth2token, itemName) {
+    logger.info("Get OpenHAB Item from " + systemConfig.system.host + " for item " + itemName);
 
-    //"category": thingType.category,
+     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemNamee)}`, {
+        headers: {
+            Authorization: `Bearer ${oauth2token}`,
+            "WWW-Authenticate": "Basic"
+        },
+        httpsAgent: AXIOS_AGENT
+    }).then((res) => {
+        logger.debug("OpenHAB Item instance: " + JSON.stringify(res.data))
+        return res.data;
+    }).catch((err) => {
+        logger.error('Error loading item from OpenHAB: ' + err);
+        return null;
+    })
+}
 
-    const eventToSend = buildMOOSTEvent(
-        Math.floor(+itemToUpdate.last_change / 1000),
-        eventType,
-        itemToUpdate.openhab,
-        device.UID,
-        deviceLocation,
-        deviceType,
-        device.properties.vendorName,
-        device.properties.productName,
-        state,
-        itemToUpdate
-    )
+/**
+ * Load links form the OpenHAB Instance by itemName
+ * @param oauth2token The Token which is used for authentication against the openHAB instance
+ * @param itemName The name of the OpenHAB Item for which we want to retrieve all links
+ * @returns {Promise<AxiosResponse<any>>}
+ */
+async function loadLinksByItemName(oauth2token, itemName) {
+    logger.info("Get OpenHAB Links for item " + itemName);
+
+    return axios.get(`${OPENHAB_CLOUD_REST_HOST}/links/?itemName=${encodeURIComponent(itemName)}`, {
+        headers: {
+            Authorization: `Bearer ${oauth2token}`,
+            "WWW-Authenticate": "Basic"
+        },
+        httpsAgent: AXIOS_AGENT
+    }).then((res) => {
+        logger.debug("Configured Links instance: " + JSON.stringify(res.data))
+        return res.data;
+    }).catch((err) => {
+        logger.error('Error loading Links from OpenHAB: ' + err);
+        return null;
+    })
+}
+
+/**
+ * Load thing from the OpenHAB Instance by thingUID
+ * @param oauth2token The Token which is used for authentication against the openHAB instance
+ * @param thingUID The UID of the thing that should be loaded
+ * @returns {Promise<AxiosResponse<any>>}
+ */
+async function loadThingByThingUID(oauth2token, thingUID) {
+    logger.info("Get OpenHAB Thing from " + systemConfig.system.host + " for thingUID " + thingUID);
+
+    return axios.get(`${OPENHAB_CLOUD_REST_HOST}/things/${encodeURIComponent(thingUID)}`, {
+        headers: {
+            Authorization: `Bearer ${oauth2token}`,
+            "WWW-Authenticate": "Basic"
+        },
+        httpsAgent: AXIOS_AGENT
+    }).then((res) => {
+        logger.debug("Successfully loaded OpenHAB Thing instance")
+        return res.data;
+    }).catch((err) => {
+        logger.error('Error loading Thing from OpenHAB: ' + err);
+        return null;
+    })
+}
+
+/**
+ * Assembes the final event that will be eventually sent to the MOOST API
+ * @param itemUpdate The update event that has occurred
+ * @param moostDevice The value for the "device" property in MOOST Schema format
+ * @param moostState The value for the "state" property in MOOST Schema format
+ * @returns {Promise<AxiosResponse<any>>}
+ */
+async function sendEventToMOOST(itemUpdate, moostDevice, moostState) {
+    const eventToSend = {
+        "timestamp": Math.floor(+itemUpdate.last_change / 1000),
+        "customerId": MOOST_API_CUSTOMER_ID,
+        "type": "DEVICE_EVENT_EMITTED",
+        "user": {
+            "id": itemUpdate.openhab,
+        },
+        "device": moostDevice,
+        "state": moostState,
+    }
 
     if (isAPITokenEmptyOrExpired()) {
-        await setAPIAuthToken();
+        await leaseNewMOOSTAPIToken();
     }
 
     logger.debug('MOOST: Sending event ' + JSON.stringify(eventToSend))
-    axios.post(`${MOOST_API_EVENTS_ENDPOINT}`, eventToSend, {
+    return axios.post(`${MOOST_API_EVENTS_ENDPOINT}`, eventToSend, {
         headers: {
             'Authorization': `${MOOST_API_AUTH_TOKEN}`
         }
@@ -119,16 +183,11 @@ async function sendEventToMOOST(itemToUpdate, device, deviceType, deviceLocation
     });
 }
 
-function isAPITokenEmptyOrExpired() {
-    if (MOOST_API_AUTH_TOKEN !== '') {
-        const decoded = jwt_decode(MOOST_API_AUTH_TOKEN);
-        return Math.floor(new Date() / 1000) >= decoded.exp
-    } else {
-        return true;
-    }
-}
-
-async function setAPIAuthToken() {
+/**
+ * Leases a new MOOST API Token from the auth Endpoint and stores it within MOOST_API_AUTH_TOKEN
+ * @returns {Promise<void>}
+ */
+async function leaseNewMOOSTAPIToken() {
     await axios.post(`${MOOST_API_LOGIN_ENDPOINT}`, {
             username: moostConfig.api.creds.username,
             password: moostConfig.api.creds.password
@@ -145,74 +204,65 @@ async function setAPIAuthToken() {
     });
 }
 
-function buildMOOSTEvent(eventTimeStamp, eventType, userid,
-                         deviceId, deviceLocation, deviceType, deviceVendorName, deviceProductName,
-                         state, rawEvent) {
+/**
+ * Helper function which transforms the OpenHAB Item and the itemUpdate into the MOOST State Schema
+ * @param openHABItem The OpenHAB Item which was updated
+ * @param itemUpdate The update event which occurred
+ * @returns string  JSON representing the MOOST State
+ */
+function convertOpenHABItemToMOOSTState(openHABItem, itemUpdate) {
+    if(openHABItem?.stateDescription?.options.length > 0) {
+        const stateOptions = openHABItem.stateDescription.options;
+        return {
+            // which type can we use ? this is tricky
+            type: stateOptions.filter(so => so.value === "moost_state_type")[0]?.label,
+            object: stateOptions.filter(so => so.value === "moost_state_object")[0]?.label,
+            value_after: itemUpdate.status,
+            value_before: itemUpdate.prev_status
+        }
+    } else {
+        logger.error("Please configure the needed MOOST options in the items Metadata!")
+    }
+}
+
+/**
+ * Helper function which transforms the OpenHAB thing properties into the MOOST Device Schema
+ * @param thing The loaded OpenHAB Thing which should be transformed
+ * @returns string JSON representing the MOOST Device
+ */
+function convertOpenHABThingToMOOSTDevice(thing) {
     return {
-        "timestamp": eventTimeStamp,
-        "customerId": MOOST_API_CUSTOMER_ID,
-        "type": eventType,
-        "user": {
-            "id": userid,
-        },
         "device": {
-            "id": deviceId,
-            "location": deviceLocation,
-            "type": deviceType,
-            "vendor_name": deviceVendorName,
-            "product_name": deviceProductName
-        },
-        "state": state,
-        "raw": rawEvent
-    }
-}
-
-function mapToMOOSTState(thing, itemToUpdate) {
-    let moostState = 'OTHER';
-
-    const channel = thing.channels.find(channel => {
-        return channel.linkedItems.some(linkedItem => {
-            return linkedItem === itemToUpdate.name
-        })
-    })
-
-    for (let key in STATE_TYPE_MAPPINGS) {
-        if (STATE_TYPE_MAPPINGS.hasOwnProperty(key)) {
-            if (STATE_TYPE_MAPPINGS[key].some((channelTypeUID) => {
-                return channelTypeUID === channel.channelTypeUID;
-            })) {
-                moostState = key;
-            }
+            "id": thing.UID,
+            "location":  thing.location,
+            "type": thing.label,
+            "vendor_name": thing.properties.vendor,
+            "product_name": thing.properties.modelId
         }
     }
+}
 
-    return {
-        type: moostState,
-        value_after: itemToUpdate.status,
-        value_before: itemToUpdate.prev_status
+/**
+ * Checks if the API Token in MOOST_API_AUTH_TOKEN is empty or has expired
+ * @returns {boolean} True if the token is empty or expired
+ */
+function isAPITokenEmptyOrExpired() {
+    if (MOOST_API_AUTH_TOKEN !== '') {
+        const decoded = jwt_decode(MOOST_API_AUTH_TOKEN);
+        return Math.floor(new Date() / 1000) >= decoded.exp
+    } else {
+        return true;
     }
 }
 
-function mapToMOOSTLocation(thing) {
-    return thing.location ? thing.location : "OTHER";
-}
-
-function mapToMOOSTMaxMinValues(channelType) {
-
-}
-
-function mapToMOOSTDeviceType(thing) {
-    let moostDeviceType = "OTHER";
-
-    for (let key in DEVICE_TYPE_MAPPINGS) {
-        if (DEVICE_TYPE_MAPPINGS.hasOwnProperty(key)) {
-            if (DEVICE_TYPE_MAPPINGS[key].some((thingTypeUID) => {
-                return thingTypeUID === thing.thingTypeUID;
-            })) {
-                moostDeviceType = key;
-            }
-        }
-    }
-
-    return moostDeviceType;
+/**
+ * The channelUID has the format of 4 element seperated by a colon (:).
+ * The first three parts are the same as the thingUID. By removing the last part from the String
+ * we get the thingUID out of the channelUID
+ * @param channelUID The channelUID which should be transformed into a thingUID
+ * @returns {string} The thingUID which is extracted from the channelUID
+ */
+function convertChannelUIDToThingUID(channelUID) {
+    let splittedChannelUID = channelUID.split(":");
+    return splittedChannelUID.slice(0, splittedChannelUID.length - 1).join(":");
 }
