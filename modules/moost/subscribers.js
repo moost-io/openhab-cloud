@@ -85,7 +85,7 @@ module.exports = {
 async function loadItemByItemName(oauth2token, itemName) {
     logger.info("Get OpenHAB Item from " + systemConfig.system.host + " for item " + itemName);
 
-     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemNamee)}`, {
+     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemName)}`, {
         headers: {
             Authorization: `Bearer ${oauth2token}`,
             "WWW-Authenticate": "Basic"
