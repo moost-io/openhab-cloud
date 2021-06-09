@@ -14,7 +14,7 @@ const MOOST_API_EVENTS_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.events}`;
 const MOOST_API_LOGIN_ENDPOINT = `${MOOST_API_HOST}/${moostConfig.api.login}`;
 const MOOST_API_CUSTOMER_ID = '1';
 let MOOST_API_AUTH_TOKEN = '';
-const AXIOS_AGENT= new https.Agent({
+const AXIOS_AGENT = new https.Agent({
     rejectUnauthorized: !moostConfig.openhabcloud.ignoressl
 });
 
@@ -46,7 +46,7 @@ module.exports = {
 
                 OAuth2Token.findOne({
                     user: user.id
-                },  async function (error, oauth2token) {
+                }, async function (error, oauth2token) {
                     let moostDevice;
                     //This Part loads the corresponding item and maps it to the moostState
                     const openHABItem = await loadItemByItemName(oauth2token.token, itemUpdate.name);
@@ -62,7 +62,7 @@ module.exports = {
                     //which we can load an convert to device information for the MOOST Platform
                     //Otherwise we will just leave the DEVICE part empty
                     //and assume the event is not triggered through a specific device
-                    if(configuredLinksForItem?.length === 1){
+                    if (configuredLinksForItem?.length === 1) {
                         const linkFromItemToThing = configuredLinksForItem[0];
                         const thingUID = convertChannelUIDToThingUID(linkFromItemToThing.channelUID);
                         const thing = await loadThingByThingUID(oauth2token.token, thingUID);
@@ -85,7 +85,7 @@ module.exports = {
 async function loadItemByItemName(oauth2token, itemName) {
     logger.info("Get OpenHAB Item from " + systemConfig.system.host + " for item " + itemName);
 
-     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemName)}`, {
+    return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemName)}`, {
         headers: {
             Authorization: `Bearer ${oauth2token}`,
             "WWW-Authenticate": "Basic"
@@ -211,7 +211,7 @@ async function leaseNewMOOSTAPIToken() {
  * @returns string  JSON representing the MOOST State
  */
 function convertOpenHABItemToMOOSTState(openHABItem, itemUpdate) {
-    if(openHABItem?.stateDescription?.options.length > 0) {
+    if (openHABItem?.stateDescription?.options.length > 0) {
         const stateOptions = openHABItem.stateDescription.options;
         return {
             // which type can we use ? this is tricky
@@ -228,17 +228,15 @@ function convertOpenHABItemToMOOSTState(openHABItem, itemUpdate) {
 /**
  * Helper function which transforms the OpenHAB thing properties into the MOOST Device Schema
  * @param thing The loaded OpenHAB Thing which should be transformed
- * @returns string JSON representing the MOOST Device
+ * @returns string JSON representing the MOOST Device properties
  */
 function convertOpenHABThingToMOOSTDevice(thing) {
     return {
-        "device": {
-            "id": thing.UID,
-            "location":  thing.location,
-            "type": thing.label,
-            "vendor_name": thing.properties.vendor,
-            "product_name": thing.properties.modelId
-        }
+        id: thing.UID,
+        location: thing.location,
+        type: thing.label,
+        vendor_name: thing.properties.vendor,
+        product_name: thing.properties.modelId
     }
 }
 
