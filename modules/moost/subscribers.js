@@ -24,23 +24,23 @@ module.exports = {
         logger.debug('MOOST: Received ItemUpdate via eventEmitter: ' + itemUpdate);
         Openhab.findById(itemUpdate.openhab, function (error, openhab) {
             if (error) {
-                logger.error('openHAB lookup error: ' + error);
+                logger.error('MOOST: openHAB lookup error: ' + error);
                 return;
             }
             if (!openhab) {
-                logger.debug('openHAB not found');
+                logger.debug('MOOST: openHAB not found');
                 return;
             }
             User.findOne({
                 account: openhab.account
             }, function (error, user) {
                 if (error) {
-                    logger.error('openHAB-cloud: Error getting user: ' + error);
+                    logger.error('MOOST: Error getting user: ' + error);
                     return;
                 }
 
                 if (!user) {
-                    logger.debug('openHAB-cloud: No user found for openHAB');
+                    logger.debug('MOOST: No user found for openHAB');
                     return;
                 }
 
@@ -83,7 +83,7 @@ module.exports = {
  * @returns {Promise<AxiosResponse<any>>}
  */
 async function loadItemByItemName(oauth2token, itemName) {
-    logger.info("Get OpenHAB Item from " + systemConfig.system.host + " for item " + itemName);
+    logger.info(`MOOST: Get OpenHAB Item from ${systemConfig.system.host} for item ${itemName}`);
 
     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/items/${encodeURIComponent(itemName)}`, {
         headers: {
@@ -92,10 +92,10 @@ async function loadItemByItemName(oauth2token, itemName) {
         },
         httpsAgent: AXIOS_AGENT
     }).then((res) => {
-        logger.debug("OpenHAB Item instance: " + JSON.stringify(res.data))
+        logger.debug('MOOST: OpenHAB Item instance: ' + JSON.stringify(res.data))
         return res.data;
     }).catch((err) => {
-        logger.error('Error loading item from OpenHAB: ' + err);
+        logger.error('MOOST: Error loading item from OpenHAB: ' + err);
         return null;
     })
 }
@@ -107,7 +107,7 @@ async function loadItemByItemName(oauth2token, itemName) {
  * @returns {Promise<AxiosResponse<any>>}
  */
 async function loadLinksByItemName(oauth2token, itemName) {
-    logger.info("Get OpenHAB Links for item " + itemName);
+    logger.info(`MOOST: Get OpenHAB Links for item ${itemName}`);
 
     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/links/?itemName=${encodeURIComponent(itemName)}`, {
         headers: {
@@ -116,10 +116,10 @@ async function loadLinksByItemName(oauth2token, itemName) {
         },
         httpsAgent: AXIOS_AGENT
     }).then((res) => {
-        logger.debug("Configured Links instance: " + JSON.stringify(res.data))
+        logger.debug('MOOST: Configured Links instance: ' + JSON.stringify(res.data))
         return res.data;
     }).catch((err) => {
-        logger.error('Error loading Links from OpenHAB: ' + err);
+        logger.error('MOOST: Error loading Links from OpenHAB: ' + err);
         return null;
     })
 }
@@ -131,7 +131,7 @@ async function loadLinksByItemName(oauth2token, itemName) {
  * @returns {Promise<AxiosResponse<any>>}
  */
 async function loadThingByThingUID(oauth2token, thingUID) {
-    logger.info("Get OpenHAB Thing from " + systemConfig.system.host + " for thingUID " + thingUID);
+    logger.info(`MOOST: Get OpenHAB Thing from ${systemConfig.system.host} for thingUID ${thingUID}`);
 
     return axios.get(`${OPENHAB_CLOUD_REST_HOST}/things/${encodeURIComponent(thingUID)}`, {
         headers: {
@@ -140,10 +140,10 @@ async function loadThingByThingUID(oauth2token, thingUID) {
         },
         httpsAgent: AXIOS_AGENT
     }).then((res) => {
-        logger.debug("Successfully loaded OpenHAB Thing instance")
+        logger.debug('MOOST: Successfully loaded OpenHAB Thing instance')
         return res.data;
     }).catch((err) => {
-        logger.error('Error loading Thing from OpenHAB: ' + err);
+        logger.error('MOOST: Error loading Thing from OpenHAB: ' + err);
         return null;
     })
 }
@@ -177,9 +177,9 @@ async function sendEventToMOOST(itemUpdate, moostDevice, moostState) {
             'Authorization': `${MOOST_API_AUTH_TOKEN}`
         }
     }).then((res) => {
-        logger.debug('openHAB-cloud: Sending event to MOOST ended with status: ' + res.status);
+        logger.debug('MOOST: openHAB-cloud: Sending event to MOOST ended with status: ' + res.status);
     }).catch((error) => {
-        logger.error('openHAB-cloud: Error sending event to MOOST: ' + error);
+        logger.error('MOOST: Error sending event to MOOST: ' + error);
     });
 }
 
@@ -188,19 +188,19 @@ async function sendEventToMOOST(itemUpdate, moostDevice, moostState) {
  * @returns {Promise<void>}
  */
 async function leaseNewMOOSTAPIToken() {
+    logger.info("MOOST: Lease a new JWT for the MOOST API")
     await axios.post(`${MOOST_API_LOGIN_ENDPOINT}`, {
-            username: moostConfig.api.creds.username,
-            password: moostConfig.api.creds.password
-        }
-    ).then((res) => {
+        username: moostConfig.api.creds.username,
+        password: moostConfig.api.creds.password
+    }).then((res) => {
         if ('authorization' in res.headers) {
             MOOST_API_AUTH_TOKEN = res.headers['authorization']
-            logger.info('Successful received a new MOOST API Token. ' + MOOST_API_AUTH_TOKEN)
+            logger.info('MOOST: Successful received a new MOOST API JWT.')
         } else {
-            logger.error('Response from MOOST Auth Service did not include an Authorization Header.')
+            logger.error('MOOST: Response from MOOST Auth Service did not include an Authorization Header.')
         }
     }).catch((error) => {
-        logger.error('openHAB-cloud: Error receiving JWT from MOOST: ' + error)
+        logger.error('MOOST: Error receiving JWT from MOOST: ' + error)
     });
 }
 
@@ -221,7 +221,7 @@ function convertOpenHABItemToMOOSTState(openHABItem, itemUpdate) {
             value_before: itemUpdate.prev_status
         }
     } else {
-        logger.error("Please configure the needed MOOST options in the items Metadata!")
+        logger.error('MOOST: Please configure the needed MOOST options in the items Metadata!')
     }
 }
 
