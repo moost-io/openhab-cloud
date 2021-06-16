@@ -35,7 +35,7 @@ exports.v1triggerrecommendation = [
         const data = {
             userId: req.user.id,
             user: req.user,
-            message: req.body.message.de,
+            message: req.body.message.en,
             icon: '',
             severity: req.body.priority
         }
