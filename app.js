@@ -220,7 +220,7 @@ var OpenhabAccessLog = require('./models/openhabaccesslog');
 
 logger.info('openHAB-cloud: Scheduling a statistics job (every 5 min)');
 var every5MinStatJob = require('./jobs/every5minstat');
-const { request } = require('http');
+const {request} = require('http');
 every5MinStatJob.start();
 
 // Configure the openHAB-cloud for development mode, if in development
@@ -369,14 +369,20 @@ var rt = new routes(requestTracker, logger);
 rt.setSocketIO(io);
 rt.setupRoutes(app);
 
-function sendNotificationToUser(user, message, icon, severity) {
+function sendNotificationToUser(user, message, icon, severity, title,
+                                positiveAction, negativeAction) {
     var androidRegistrations = [];
     var iosDeviceTokens = [];
     var newNotification = new Notification({
         user: user.id,
         message: message,
         icon: icon,
-        severity: severity
+        severity: severity,
+        title: title,
+        positiveActionText: positiveAction?.text,
+        positiveActionType: positiveAction?.action,
+        negativeActionText: negativeAction?.text,
+        negativeActionType: negativeAction?.action
     });
     newNotification.save(function (error) {
         if (error) {
@@ -900,10 +906,10 @@ io.sockets.on('connection', function (socket) {
             logger.info('openHAB-cloud: openHAB ' + self.handshake.uuid + ' requested to update ' + data.type + ' config ' +
                 data.name + ' with timestamp = ' + data.timestamp);
             OpenhabConfig.findOne({
-                openhab: openhab.id,
-                type: data.type,
-                name: data.name
-            },
+                    openhab: openhab.id,
+                    type: data.type,
+                    name: data.name
+                },
                 function (error, openhabConfig) {
                     if (error) {
                         logger.warn('openHAB-cloud: Failed to find ' + self.openhab.uuid + ' config: ' + error);

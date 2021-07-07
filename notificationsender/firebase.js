@@ -35,12 +35,18 @@ exports.sendMessageNotification = function (registrationIds, message) {
 
 exports.sendNotification = function (registrationIds, notification) {
     var data = {
+        title: notification.title,
         message: notification.message,
         severity: notification.severity,
         icon: notification.icon,
         persistedId: notification._id,
-        timestamp: notification.created.getTime()
+        timestamp: notification.created.getTime(),
+        positiveActionText: notification.positiveActionText,
+        positiveActionType: notification.positiveActionType,
+        negativeActionText: notification.negativeActionText,
+        negativeActionType: notification.negativeActionType
     };
+
     sendNotificationWithData(registrationIds, data);
 };
 

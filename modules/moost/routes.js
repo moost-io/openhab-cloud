@@ -27,20 +27,13 @@ exports.v1triggerrecommendation = [
         if (!req.body.priority) {
             return res.status(400).json({errors: [{message: "Missing Priority"}]});
         }
+        //User is enriched through passport
         if (!req.user) {
             return res.status(400).json({errors: [{message: "Missing User"}]});
         }
-
-        //User is enriched through passport
-        const data = {
-            userId: req.user.id,
-            user: req.user,
-            message: req.body.message.en,
-            icon: '',
-            severity: req.body.priority
-        }
-
-        eventEmitter.emit('sendRecommendation', data.user, data.message, data.icon, data.severity)
+        
+        eventEmitter.emit('sendRecommendation', req.user, req.body.message.en, '', req.body.priority, req.body.title.en,
+            req.body.positiveAction, req.body.negativeAction)
         res.sendStatus(204).end()
     }
 ]
