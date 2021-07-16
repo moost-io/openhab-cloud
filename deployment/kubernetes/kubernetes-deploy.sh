@@ -46,8 +46,6 @@ kubectl create -f openhabcloud_app.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_certificate.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_app_service.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_app_ingress.yml --namespace $KUBERNETES_NAMESPACE
-kubectl create -f openhabcloud_mongodb.yml --namespace $KUBERNETES_NAMESPACE
-kubectl create -f openhabcloud_mongodb_service.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_redis.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_redis_service.yml --namespace $KUBERNETES_NAMESPACE
 kubectl create -f openhabcloud_loadbalancer.yml --namespace $KUBERNETES_NAMESPACE
