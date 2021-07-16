@@ -32,14 +32,16 @@ within the openhab-cloud container.
   ```cd /opt/openhabcloud/scripts```
 - Now call the ```addoauth.js``` script with the following pattern
     - ```node addoauth.js <clientName> <clientId> <clientSecret> <clientToken> <clientUserId>```
-    - f.e. ```node addoauth.js moostClient ae43aab9b808409a8c962dc4e8ad3041 94b75727c9ff49239f913eac67f142ff xw4tHQPORJddQbelJfka4uhZqN7rKZoE 60358a6c5897f3f2cc788396```
+    -
+    f.e. ```node addoauth.js moostClient ae43aab9b808409a8c962dc4e8ad3041 94b75727c9ff49239f913eac67f142ff xw4tHQPORJddQbelJfka4uhZqN7rKZoE 60358a6c5897f3f2cc788396```
 
 **addoauth.js Parameter description**
 
 - clientName: Defaults to ```moostClient```
 - clientId: A unique identifier for this client (generate a new one online)
 - clientSecret: // Client oauth2 secret (generate a new one online)
-- clientToken: The Bearer token which is used to authenticate to the local OpenHAB. Has to be generated in the openhab ui under profile!!!!
+- clientToken: The Bearer token which is used to authenticate to the local OpenHAB. Has to be generated in the openhab ui under
+  profile! Including the oh.name. part
 - clientUserId: The User ID we have read from mongodb in the last step
 
 ### User devices for local development
