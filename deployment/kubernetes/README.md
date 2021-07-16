@@ -54,6 +54,13 @@ To update a deployment with f.e. a new version of a new container use the follow
 
     kubectl rollout restart deployment/openhab-cloud
 
+### Update ConfigMap
+
+When you need to update a config map just re-apply it and restart the deployment:
+
+    kubectl apply -f openhabcloud_config_map.yml
+    kubectl rollout restart deployment/openhab-cloud
+
 ### Undeploying
 
 There also is a script for shutting down and undeploying openHAB-cloud:
