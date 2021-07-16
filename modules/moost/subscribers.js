@@ -50,26 +50,29 @@ module.exports = {
                     let moostDevice;
                     //This Part loads the corresponding item and maps it to the moostState
                     const openHABItem = await loadItemByItemName(oauth2token.token, itemUpdate.name);
-                    const moostState = convertOpenHABItemToMOOSTState(openHABItem, itemUpdate);
+                    if (openHABItem) {
+                        const moostState = convertOpenHABItemToMOOSTState(openHABItem, itemUpdate);
+                        //This Part identifies the connected thing and maps it to a MOOST Device
+                        //Same item can be linked to different things
+                        //(f.e. left home item can be updated by multiple different buttons)
+                        const configuredLinksForItem = await loadLinksByItemName(oauth2token.token, openHABItem.name);
+                        //We need to define what we will do if an item is linked to multiple devices
+                        //which device will be associated to the event in the MOOST Platform?
+                        //If we have here > 0 than there is a physical thing configured in OpenHAB for this Item
+                        //which we can load an convert to device information for the MOOST Platform
+                        //Otherwise we will just leave the DEVICE part empty
+                        //and assume the event is not triggered through a specific device
+                        if (configuredLinksForItem?.length === 1) {
+                            const linkFromItemToThing = configuredLinksForItem[0];
+                            const thingUID = convertChannelUIDToThingUID(linkFromItemToThing.channelUID);
+                            const thing = await loadThingByThingUID(oauth2token.token, thingUID);
+                            moostDevice = convertOpenHABThingToMOOSTDevice(thing, itemUpdate);
+                        }
 
-                    //This Part identifies the connected thing and maps it to a MOOST Device
-                    //Same item can be linked to different things
-                    //(f.e. left home item can be updated by multiple different buttons)
-                    const configuredLinksForItem = await loadLinksByItemName(oauth2token.token, openHABItem.name);
-                    //We need to define what we will do if an item is linked to multiple devices
-                    //which device will be associated to the event in the MOOST Platform?
-                    //If we have here > 0 than there is a physical thing configured in OpenHAB for this Item
-                    //which we can load an convert to device information for the MOOST Platform
-                    //Otherwise we will just leave the DEVICE part empty
-                    //and assume the event is not triggered through a specific device
-                    if (configuredLinksForItem?.length === 1) {
-                        const linkFromItemToThing = configuredLinksForItem[0];
-                        const thingUID = convertChannelUIDToThingUID(linkFromItemToThing.channelUID);
-                        const thing = await loadThingByThingUID(oauth2token.token, thingUID);
-                        moostDevice = convertOpenHABThingToMOOSTDevice(thing, itemUpdate);
+                        sendEventToMOOST(itemUpdate, moostDevice, moostState)
+                    } else {
+                        logger.error('Could not load openHABItem. Check if oauth2token.token is correctly set-up.')
                     }
-
-                    sendEventToMOOST(itemUpdate, moostDevice, moostState)
                 });
             })
         });
@@ -162,6 +165,8 @@ async function sendEventToMOOST(itemUpdate, moostDevice, moostState) {
         "type": "DEVICE_EVENT_EMITTED",
         "user": {
             "id": itemUpdate.openhab,
+            "zip": 8645,
+            "country_code": "CH"
         },
         "device": moostDevice,
         "state": moostState,
